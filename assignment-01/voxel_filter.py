@@ -2,6 +2,7 @@
 
 import open3d as o3d 
 import os
+import random
 import numpy as np
 from pyntcloud import PyntCloud
 
@@ -14,49 +15,69 @@ def voxel_filter(point_cloud, leaf_size, method='random'):
     # 作业3
     # 屏蔽开始
 
+    # 优化版本，主要是 numpy broadcast 和 unique 的使用
     point_cloud = np.array(point_cloud, dtype=np.float64) # int32 overflow!
-    X = point_cloud[:, 0]
-    Y = point_cloud[:, 1]
-    Z = point_cloud[:, 2]
+    uppers = np.max(point_cloud, axis=0)
+    lowers = np.min(point_cloud, axis=0)
 
-    # compute the min or max of the point set
-    x_max, x_min = np.max(X), np.min(X)
-    y_max, y_min = np.max(Y), np.min(Y)
-    z_max, z_min = np.max(Z), np.min(Z)
+    dims = np.ceil((uppers - lowers) / leaf_size)
 
-    # compute the dimension of the voxel grid
-    Dx = np.ceil((x_max - x_min) / leaf_size)
-    Dy = np.ceil((y_max - y_min) / leaf_size)
-    Dz = np.ceil((z_max - z_min) / leaf_size)
+    # indices: mx3
+    indices = np.floor((point_cloud - lowers) / leaf_size)
 
-    # compute voxel index for each point
-    hx = np.floor(((X - x_min) / leaf_size))
-    hy = np.floor(((Y - y_min) / leaf_size))
-    hz = np.floor(((Z - z_min) / leaf_size))
-    idx = np.array(hx + hy * Dx + hz * Dz * Dy, dtype=np.float64)
+    # h_indices: m
+    h_indices = indices[:, 0] + indices[:, 1] * dims[0] + indices[:, 2] * dims[0] * dims[1]
 
-    # sort the points according to the index
-    point_cloud_idx = np.insert(point_cloud, 0, values=idx, axis=1)
-    point_cloud_idx = point_cloud_idx[np.lexsort(point_cloud_idx[:,::-1].T)]
+    for h_index in np.unique(h_indices):
+        points = point_cloud[h_indices == h_index]
+        if method == 'centriod':
+            filtered_points.append(np.mean(points, axis=0))
+        else:
+            filtered_points.append(random.choice(points))
 
-    # iterate the sorted points
-    point_cloud_idx[:, 0].astype(np.int32)
-    n, k = 0, point_cloud_idx[0, 0]
-    if method == 'random':
-        for i in range(point_cloud_idx.shape[0]):
-            if point_cloud_idx[i, 0] != k:
-                point_rand = np.random.randint(n, i)
-                filtered_points.append(
-                    point_cloud_idx[point_rand, 1:4])
-                n, k = i, point_cloud_idx[i, 0]
-    elif method == 'centroid':
-        for i in range(point_cloud_idx.shape[0]):
-            if point_cloud_idx[i, 0] != k:
-                filtered_points.append(
-                    np.mean(point_cloud_idx[n:i, 1:4], axis=0))
-                n, k = i, point_cloud_idx[i, 0]
-    else:
-        raise NotImplementedError
+    # point_cloud = np.array(point_cloud, dtype=np.float64) # int32 overflow!
+    # X = point_cloud[:, 0]
+    # Y = point_cloud[:, 1]
+    # Z = point_cloud[:, 2]
+
+    # # compute the min or max of the point set
+    # x_max, x_min = np.max(X), np.min(X)
+    # y_max, y_min = np.max(Y), np.min(Y)
+    # z_max, z_min = np.max(Z), np.min(Z)
+
+    # # compute the dimension of the voxel grid
+    # Dx = np.ceil((x_max - x_min) / leaf_size)
+    # Dy = np.ceil((y_max - y_min) / leaf_size)
+    # Dz = np.ceil((z_max - z_min) / leaf_size)
+
+    # # compute voxel index for each point
+    # hx = np.floor(((X - x_min) / leaf_size))
+    # hy = np.floor(((Y - y_min) / leaf_size))
+    # hz = np.floor(((Z - z_min) / leaf_size))
+    # idx = np.array(hx + hy * Dx + hz * Dz * Dy, dtype=np.float64)
+
+    # # sort the points according to the index
+    # point_cloud_idx = np.insert(point_cloud, 0, values=idx, axis=1)
+    # point_cloud_idx = point_cloud_idx[np.lexsort(point_cloud_idx[:,::-1].T)]
+
+    # # iterate the sorted points
+    # point_cloud_idx[:, 0].astype(np.int32)
+    # n, k = 0, point_cloud_idx[0, 0]
+    # if method == 'random':
+    #     for i in range(point_cloud_idx.shape[0]):
+    #         if point_cloud_idx[i, 0] != k:
+    #             point_rand = np.random.randint(n, i)
+    #             filtered_points.append(
+    #                 point_cloud_idx[point_rand, 1:4])
+    #             n, k = i, point_cloud_idx[i, 0]
+    # elif method == 'centroid':
+    #     for i in range(point_cloud_idx.shape[0]):
+    #         if point_cloud_idx[i, 0] != k:
+    #             filtered_points.append(
+    #                 np.mean(point_cloud_idx[n:i, 1:4], axis=0))
+    #             n, k = i, point_cloud_idx[i, 0]
+    # else:
+    #     raise NotImplementedError
 
     # 屏蔽结束
 

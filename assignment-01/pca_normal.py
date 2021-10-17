@@ -55,10 +55,15 @@ def main():
 
     # 用PCA分析点云主方向
     w, v = PCA(points)
-    point_cloud_vector = v[:, 2] #点云主方向对应的向量
+    point_cloud_vector = v[:, 0] #点云主方向对应的向量
     print('the main orientation of this pointcloud is: ', point_cloud_vector)
     # TODO: 此处只显示了点云，还没有显示PCA
-    # o3d.visualization.draw_geometries([point_cloud_o3d])
+    projected_points = np.dot(points, v[:, :2])
+    projected_points = np.hstack([projected_points,
+        np.zeros((projeced_points.shape[0], 1))])
+    projected_point_cloud_o3d = o3d.geometry.PointCloud()
+    projected_point_cloud_o3d.points = o3d.utility.Vector3dVector(projected_points)
+    o3d.visualization.draw_geometries([projected_point_cloud_o3d])
     
     # 循环计算每个点的法向量
     pcd_tree = o3d.geometry.KDTreeFlann(point_cloud_o3d)
