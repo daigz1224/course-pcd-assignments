@@ -54,6 +54,10 @@ def axis_round_robin(axis, dim):
     else:
         return axis + 1
 
+def axis_by_variance(data):
+    vars = np.var(data, axis=0)
+    return np.argmax(vars)
+
 # 功能：通过递归的方式构建树
 # 输入：
 #     root: 树的根节点
@@ -63,7 +67,7 @@ def axis_round_robin(axis, dim):
 #     leaf_size: scalar
 # 输出：
 #     root: 即构建完成的树
-def kdtree_recursive_build(root, db, point_indices, axis, leaf_size):
+def kdtree_recursive_build(root, db, point_indices, axis, leaf_size, axis_method):
     if root is None:
         root = Node(axis, None, None, None, point_indices)
 
@@ -85,19 +89,25 @@ def kdtree_recursive_build(root, db, point_indices, axis, leaf_size):
         
         root.value = (middle_left_point_value + middle_right_point_value) * 0.5
 
+        next_axis_l = axis_round_robin(axis, db.shape[1])
+        next_axis_r = next_axis_l
+        if axis_method == 'by_variance':
+            if middle_right_point_idx > 0:
+                next_axis_l = axis_by_variance(db[point_indices_sorted[0:middle_right_point_idx]])
+            if middle_right_point_idx < len(point_indices_sorted):
+                next_axis_r = axis_by_variance(db[point_indices_sorted[middle_right_point_idx:]])
+
         # --- get the split position --- #
         root.left = kdtree_recursive_build(root.left,
                                            db,
                                            point_indices_sorted[0:middle_right_idx], # [0: middle_right_idx) equal to [0:middle_left_idx]
-                                           axis_round_robin(
-                                               axis, dim=db.shape[1]),  # switch to next axis in a circle
-                                           leaf_size)
+                                           next_axis_l,
+                                           leaf_size, axis_method=axis_method)
         root.right = kdtree_recursive_build(root.right,
                                             db,
                                             point_indices_sorted[middle_right_idx:],
-                                            axis_round_robin(
-                                                axis, dim=db.shape[1]),
-                                            leaf_size)
+                                            next_axis_r,
+                                            leaf_size, axis_method=axis_method)
 
         # 屏蔽结束
     return root
@@ -127,16 +137,22 @@ def traverse_kdtree(root: Node, depth, max_depth):
 #     leaf_size：scale
 # 输出：
 #     root：构建完成的kd树
-def kdtree_construction(db_np, leaf_size):
+def kdtree_construction(db_np, leaf_size, axis_method='round_robin'):
     N, dim = db_np.shape[0], db_np.shape[1]
+    if axis_method == 'round_robin':
+        axis = 0
+    elif axis_method == 'by_variance':
+        axis = axis_by_variance(db_np)
+    else:
+        raise NotImplementedError
 
     # build kd_tree recursively
     root = None
     root = kdtree_recursive_build(root,
                                   db_np,
                                   np.arange(N),
-                                  axis=0,
-                                  leaf_size=leaf_size)
+                                  axis,
+                                  leaf_size=leaf_size, axis_method=axis_method)
     return root
 
 
